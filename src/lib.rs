@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use chrono::NaiveDate;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WatchableMedia {
@@ -7,6 +8,7 @@ pub struct WatchableMedia {
     // todo: genres
     // todo: country
     pub media_type: MediaType,
+    pub updated: NaiveDate,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

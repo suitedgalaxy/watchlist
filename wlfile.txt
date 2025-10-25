@@ -1,0 +1,1 @@
+(title:"Chainsaw Man",year:Some(2022),media_type:Anime(watch_progress:Finished((season:1,episode:12)),ongoing:true),updated:"2025-10-24")

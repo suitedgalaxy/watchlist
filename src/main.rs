@@ -1,8 +1,7 @@
 use std::io::{BufRead, BufReader, Write};
-
-use chrono::NaiveDate;
-use watchlist::{MediaType, MultiPartWatchProgress, WatchPosition, WatchableMedia};
 use clap::{Parser, Subcommand};
+
+mod terminal_editor;
 
 fn main() {
     let cli = Cli::parse();
@@ -18,7 +17,7 @@ fn main() {
                             )
                         )
                         .filter_map(|r|
-                            if let Ok(Ok(w)) = r { Some(w) } else { None }
+                            if let Ok(Ok(w)) = r { Some(w) } else { eprintln!("{r:?}"); None }
                         )
                     {
                         println!("{wm:?}");
@@ -29,49 +28,22 @@ fn main() {
             }
         },
         CliMode::Append => {
+            let mut wm = WatchableMedia::default();
             match std::fs::OpenOptions::new().append(true).open(cli.watchlist_file) {
-                Ok(mut f) => if let Some(wm) = prompt_create_wm() {
+                Ok(mut f) => if let Ok(()) = terminal_editor::edit_watchable_media(&mut wm) {
                     let _ = f.write("\n".as_bytes());
                     let _ = f.write_all(ron::to_string(&wm).unwrap().as_bytes());
+                    println!("added {wm:?}");
+                } else {
+                    eprintln!("error with prompting");
                 }
                 Err(e) => eprintln!("file error: {e}"),
             }
         },
-        CliMode::ReadWrite => {},
-    }
-    // let media = WatchableMedia {
-    //     title: "Chainsaw Man".to_owned().into_boxed_str(),
-    //     year: Some(2022),
-    //     media_type: MediaType::Anime {
-    //         watch_progress: MultiPartWatchProgress::Finished(WatchPosition {
-    //             season: 1,
-    //             episode: 12,
-    //         }),
-    //         ongoing: true,
-    //     },
-    //     updated: NaiveDate::from_ymd_opt(2025, 10, 24).unwrap(),
-    // };
-    // match ron::to_string(&media) {
-    //     Ok(s) => println!("{s}"),
-    //     Err(_) => eprintln!("error"),
-    // }
-    
-}
-
-fn prompt_create_wm() -> Option<WatchableMedia> {
-    let media = WatchableMedia {
-        title: "Chainsaw Man".to_owned().into_boxed_str(),
-        year: Some(2022),
-        media_type: MediaType::Anime {
-            watch_progress: MultiPartWatchProgress::Finished(WatchPosition {
-                season: 1,
-                episode: 12,
-            }),
-            ongoing: true,
+        CliMode::ReadWrite => {
+            
         },
-        updated: NaiveDate::from_ymd_opt(2025, 10, 24).unwrap(),
-    };
-    Some(media)
+    }
 }
 
 #[derive(Parser)]
@@ -92,4 +64,66 @@ enum CliMode {
     /// read watchlist, output, and prompt to edit [alias: rw]
     #[command(alias = "rw")]
     ReadWrite,
+}
+
+use serde::{Deserialize, Serialize};
+use chrono::NaiveDate;
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WatchableMedia {
+    pub title: String,
+    pub year: Option<u16>,
+    // todo: genres
+    // todo: country
+    pub media_type: MediaType,
+    pub updated: NaiveDate,
+}
+impl Default for WatchableMedia {
+    fn default() -> Self {
+        Self {
+            title: Default::default(),
+            year: Default::default(),
+            media_type: Default::default(),
+            updated: chrono::Local::now().date_naive()
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum MediaType {
+    Movie {
+        watched: bool,
+    },
+    TvShow {
+        watch_progress: MultiPartWatchProgress,
+        ongoing: bool,
+    },
+    Anime {
+        watch_progress: MultiPartWatchProgress,
+        ongoing: bool,
+    },
+}
+impl Default for MediaType {
+    fn default() -> Self {
+        Self::Movie { watched: false }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum MultiPartWatchProgress {
+    Virgin,
+    Partial(WatchPosition),
+    Finished(WatchPosition),
+}
+impl Default for MultiPartWatchProgress {
+    fn default() -> Self {
+        Self::Virgin
+    }
+}
+
+/// represents the last episode/season watched
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct WatchPosition {
+    pub season: u16,
+    pub episode: Option<u16>,
 }

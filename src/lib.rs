@@ -1,23 +1,38 @@
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct WatchableMedia {
-    // unchanging properties
+pub struct VideoWork {
     pub title: String,
     pub year: u16,
-    pub media_type: MediaType,
-
-    // changing / opinionated properties
-    pub tracker_site: Option<String>,
-    pub watch_site: Option<String>,
-    pub watch_position: Option<WatchPosition>,
-    pub watch_status: WatchStatus,
-    pub ongoing: bool,
+    pub medium: VideoWorkMedium,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub enum MediaType {
+pub enum VideoWorkMedium {
     Movie,
     TvShow,
     Anime,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct VideoMedia {
+    pub work: VideoWork,
+
+    // changing / opinionated properties
+    pub site_data: SiteData,
+    pub watch_data: WatchData,
+    pub ongoing: bool,
+    pub updated: chrono::NaiveDate,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct SiteData {
+    pub tracker: Option<String>,
+    pub watch: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
+pub struct WatchData {
+    pub status: WatchStatus,
+    pub position: Option<WatchPosition>,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -29,6 +44,7 @@ pub enum WatchStatus {
     Exhausted,
 }
 
+/// the last position that has been watched i.e. should watch the episode after the position
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct WatchPosition {
     pub season: u16,

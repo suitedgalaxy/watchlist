@@ -1,129 +1,87 @@
-use std::io::{BufRead, BufReader, Write};
-use clap::{Parser, Subcommand};
+use std::{fs, io::Write as _};
+use clap::Parser;
+use watchlist::VideoMedia;
 
-mod terminal_editor;
+mod videomedia_editor;
+mod clap_config;
+use clap_config::Mode;
 
 fn main() {
-    let cli = Cli::parse();
-    match cli.mode {
-        CliMode::Read => {
-            match std::fs::OpenOptions::new().read(true).open(cli.watchlist_file) {
-                Ok(f) => {
-                    for wm in BufReader::new(f)
-                        .lines()
-                        .map(|r|
-                            r.map(|l|
-                                ron::from_str::<WatchableMedia>(&l)
-                            )
-                        )
-                        .filter_map(|r|
-                            if let Ok(Ok(w)) = r { Some(w) } else { eprintln!("{r:?}"); None }
-                        )
-                    {
-                        println!("{wm:?}");
+    let config = clap_config::Config::parse();
+
+    match config.mode {
+        Mode::ListAll => {
+            match fs::File::open(config.datafile) {
+                Err(_) => eprintln!("error opening datafile"),
+                Ok(f) => for res in iter_parse_file(&f) {
+                    match res {
+                        Err(_) => eprintln!("error reading line from datafile"),
+                        Ok(Err(_)) => eprintln!("error parsing line from datafile"),
+                        Ok(Ok(videomedia)) => {
+                            println!("{videomedia:#?}")
+                        }
                     }
-                    
-                }
-                Err(e) => eprintln!("file error: {e}"),
+                },
             }
         },
-        CliMode::Append => {
-            let mut wm = WatchableMedia::default();
-            match std::fs::OpenOptions::new().append(true).open(cli.watchlist_file) {
-                Ok(mut f) => if let Ok(()) = terminal_editor::edit_watchable_media(&mut wm) {
-                    let _ = f.write("\n".as_bytes());
-                    let _ = f.write_all(ron::to_string(&wm).unwrap().as_bytes());
-                    println!("added {wm:?}");
-                } else {
-                    eprintln!("error with prompting");
+        Mode::Append => {
+            match videomedia_editor::prompt_create_video_media() {
+                Err(_) => eprintln!("error creating data"),
+                Ok(videomedia) => match ron::to_string(&videomedia) {
+                    Err(_) => eprintln!("error stringifying data"),
+                    Ok(s) => {
+                        match fs::OpenOptions::new().append(true).open(config.datafile) {
+                            Err(_) => eprintln!("error opening datafile"),
+                            Ok(mut f) => match f.write_all(format!("{s}\n").as_bytes()) {
+                                Err(_) => eprintln!("error writing to datafile"),
+                                Ok(()) => (),
+                            }
+                        }
+                    }
                 }
-                Err(e) => eprintln!("file error: {e}"),
             }
         },
-        CliMode::ReadWrite => {
-            
+        Mode::ListDetails { name } => {
+            match fs::File::open(config.datafile) {
+                Err(_) => eprintln!("error opening datafile"),
+                Ok(f) => {
+                    let mut name_matches = Vec::new();
+                    for res in iter_parse_file(&f) {
+                        match res {
+                            Err(_) => eprintln!("error reading line from datafile"),
+                            Ok(Err(_)) => eprintln!("error parsing line from datafile"),
+                            Ok(Ok(videomedia)) => {
+                                if videomedia.work.title == name {
+                                    name_matches.push(videomedia);
+                                }
+                            }
+                        }
+                    }
+                    if name_matches.len() == 0 {
+                        println!("no matches")
+                    }
+                    for videomedia in name_matches {
+                        println!("{videomedia:#?}")
+                    }
+                },
+            }
+        },
+        Mode::Edit { name: _ } => {
+            todo!()
+        },
+        Mode::Remove { name: _ } => {
+            todo!()
         },
     }
 }
 
-#[derive(Parser)]
-struct Cli {
-    watchlist_file: String,
-    #[command(subcommand)]
-    mode: CliMode,
-}
-
-#[derive(Subcommand)]
-enum CliMode {
-    /// read watchlist and display [alias: r]
-    #[command(alias = "r")]
-    Read,
-    /// prompt to append a list item [alias: a]
-    #[command(alias = "a")]
-    Append,
-    /// read watchlist, output, and prompt to edit [alias: rw]
-    #[command(alias = "rw")]
-    ReadWrite,
-}
-
-use serde::{Deserialize, Serialize};
-use chrono::NaiveDate;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WatchableMedia {
-    pub title: String,
-    pub year: Option<u16>,
-    // todo: genres
-    // todo: country
-    pub media_type: MediaType,
-    pub updated: NaiveDate,
-}
-impl Default for WatchableMedia {
-    fn default() -> Self {
-        Self {
-            title: Default::default(),
-            year: Default::default(),
-            media_type: Default::default(),
-            updated: chrono::Local::now().date_naive()
-        }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum MediaType {
-    Movie {
-        watched: bool,
-    },
-    TvShow {
-        watch_progress: MultiPartWatchProgress,
-        ongoing: bool,
-    },
-    Anime {
-        watch_progress: MultiPartWatchProgress,
-        ongoing: bool,
-    },
-}
-impl Default for MediaType {
-    fn default() -> Self {
-        Self::Movie { watched: false }
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum MultiPartWatchProgress {
-    Virgin,
-    Partial(WatchPosition),
-    Finished(WatchPosition),
-}
-impl Default for MultiPartWatchProgress {
-    fn default() -> Self {
-        Self::Virgin
-    }
-}
-
-/// represents the last episode/season watched
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct WatchPosition {
-    pub season: u16,
-    pub episode: Option<u16>,
+fn iter_parse_file(f: &fs::File) -> impl Iterator<Item = std::io::Result<ron::error::SpannedResult<VideoMedia>>> {
+    use std::io::{BufReader, BufRead as _};
+    BufReader::new(f)
+        .lines()
+        .map(|line_res|
+            line_res.map(|line|
+                ron::from_str::<VideoMedia>(&line)
+            )
+        )
 }

@@ -12,7 +12,7 @@ pub fn prompt_create_video_work() -> Result<VideoWork, std::io::Error> {
         stdin.read_line(&mut title)?;
         break title.trim().to_string();
     };
-    println!("VideoWork {{\n\ttitle: {title}\n}}");
+    // println!("VideoWork {{\n\ttitle: {title}\n}}");
     let year: u16 = loop {
         print!("year: ");
         stdout.flush()?;
@@ -21,7 +21,7 @@ pub fn prompt_create_video_work() -> Result<VideoWork, std::io::Error> {
         let Ok(year) = inp.trim().parse::<u16>() else { continue; };
         break year;
     };
-    println!("VideoWork {{\n\ttitle: {title}\n\tyear: {year}\n}}");
+    // println!("VideoWork {{\n\ttitle: {title}\n\tyear: {year}\n}}");
     let medium: VideoWorkMedium = loop {
         print!("medium (movie, tvshow, anime): ");
         stdout.flush()?;
@@ -34,7 +34,7 @@ pub fn prompt_create_video_work() -> Result<VideoWork, std::io::Error> {
             _ => continue,
         }
     };
-    println!("VideoWork {{\n\ttitle: {title}\n\tyear: {year}\n\tmedium: {medium:?}\n}}");
+    // println!("VideoWork {{\n\ttitle: {title}\n\tyear: {year}\n\tmedium: {medium:?}\n}}");
     let video_work = VideoWork {
         title,
         year,

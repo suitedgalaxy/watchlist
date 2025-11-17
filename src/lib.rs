@@ -13,7 +13,7 @@ pub enum VideoWorkMedium {
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct VideoMedia {
+pub struct VideoItem {
     pub work: VideoWork,
 
     // changing / opinionated properties

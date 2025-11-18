@@ -7,7 +7,7 @@ fn main() {
     let config = Config::parse();
     match config.mode {
         Mode::ListAll => {
-            match File::open(config.datafile) {
+            match File::open(&config.datafile) {
                 Err(e) => eprintln!("error opening datafile {e:?}"),
                 Ok(f) => {
                     for video_item in FileVideoItems::new(&f) {
@@ -19,7 +19,7 @@ fn main() {
         Mode::Append => {
             match create_video_item() {
                 Err(e) => eprintln!("error creating data {e:?}"),
-                Ok(video_item) => match OpenOptions::new().append(true).open(config.datafile) {
+                Ok(video_item) => match OpenOptions::new().append(true).open(&config.datafile) {
                     Err(e) => eprintln!("error opening datafile {e:?}"),
                     Ok(mut f) => match write_video_item_to_file(&mut f, &video_item) {
                         Ok(()) => (),
@@ -30,7 +30,7 @@ fn main() {
             }
         },
         Mode::ListDetails { name } => {
-            match File::open(config.datafile) {
+            match File::open(&config.datafile) {
                 Err(e) => eprintln!("error opening datafile {e:?}"),
                 Ok(f) => {
                     for video_item in FileVideoItems::new(&f)
@@ -42,11 +42,11 @@ fn main() {
             }
         },
         Mode::Edit { name } => {
-            match File::open(config.datafile) {
+            match File::open(&config.datafile) {
                 Err(e) => eprintln!("error opening datafile {e:?}"),
                 Ok(f) => {
-                    let datafile_path = Path::new(&name);
-                    let tempfile_path = Path::new("tempfile.ron");
+                    let datafile_path = Path::new(&config.datafile);
+                    let tempfile_path = Path::new(&config.tempfile);
                     match edit_video_items_by_name_to_temp_file(
                         FileVideoItems::new(&f),
                         &name,
@@ -68,11 +68,11 @@ fn main() {
             }
         },
         Mode::Remove { name } => {
-            match File::open(config.datafile) {
+            match File::open(&config.datafile) {
                 Err(e) => eprintln!("error opening datafile {e:?}"),
                 Ok(f) => {
-                    let datafile_path = Path::new(&name);
-                    let tempfile_path = Path::new("tempfile.ron");
+                    let datafile_path = Path::new(&config.datafile);
+                    let tempfile_path = Path::new(&config.tempfile);
                     match remove_video_items_by_name_to_temp_file(
                         FileVideoItems::new(&f),
                         &name,
@@ -100,6 +100,9 @@ fn main() {
 struct Config {
     #[arg(short, long, default_value = "watchlist.ron")]
     datafile: String,
+
+    #[arg(short, long, default_value = "watchlist.temp.ron")]
+    tempfile: String,
 
     #[command(subcommand)]
     mode: Mode,
